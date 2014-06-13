@@ -144,21 +144,13 @@ This part of the assignement consitst of 2 tasks:
 This can be achieved using the following R script.
 
 ```r
-## Transform time into an readable format and add to dataframe
-time <- as.factor(sprintf("%02d:%02d", data$interval%/%100, data$interval%%100))
-data <- cbind(data, time)
-
-## Store the mean of the steps per timeinterval in results Create minute
-## interval als unique vector Convert results to numeric
-stepsPerInterval <- tapply(data$steps, data$interval, na.rm = TRUE, mean)
-stepsPerIntervalPrettyformat <- tapply(data$steps, data$time, na.rm = TRUE, 
-    mean)
-minuteInterval <- unique(data$time)
-averageSteps <- as.numeric(as.character(stepsPerInterval))
+## Store means in temporary variable to display later on
+tmp <- tapply(data$steps, data$interval, na.rm = T, mean)
 
 ## Create plot
-plot(minuteInterval, averageSteps, type = "l", xlab = "5-minute interval", ylab = "Average number of steps", 
-    main = "Average daily activity pattern")
+dailyActivity <- aggregate(steps ~ interval, data, FUN = mean, na.rm = TRUE)
+colnames(dailyActivity) <- c("Interval", "Steps")
+plot(dailyActivity, type = "l", col = "red")
 ```
 
 ![plot of chunk average daily activity pattern](figure/average_daily_activity_pattern.png) 
@@ -169,16 +161,15 @@ plot(minuteInterval, averageSteps, type = "l", xlab = "5-minute interval", ylab 
 This can be achieved using the following R script.
 
 ```r
-## Display maximum number of steps
-which.max(stepsPerIntervalPrettyformat)
+## Display interval with maximum number of steps
+which.max(tmp)
 ```
 
 ```
-## 08:35 
-##   104
+## 835 
+## 104
 ```
 
-The 5-minute interval, on average across all the days in the dataset, with the maximum number of steps is **08.35** with **104** steps.
 
 ## Imputing missing values
 
@@ -190,8 +181,8 @@ Note that there are a number of days/intervals where there are missing values (c
 ```r
 ## Display total number of missing values
 data2 <- data
-na_indices <- which(is.na(data2))
-nMissing <- length(na_indices)
+missing_indices <- which(is.na(data2$steps))
+nMissing <- length(missing_indices)
 nMissing
 ```
 
@@ -199,67 +190,38 @@ nMissing
 ## [1] 2304
 ```
 
+```r
+stepsPerInterval <- aggregate(steps ~ interval, data2, FUN = mean, na.rm = TRUE)
+dataMeans <- stepsPerInterval
+```
 
-- Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.: *Replace the missing values with the mean values of the same interval of each day, because it is likely that activities are the same per day*
+
+- Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.: *Replace the missing values with the mean values of each day, because it is likely that activities are the same per day*
 - Create a new dataset that is equal to the original dataset but with the missing data filled in.
 
 
 ```r
-## Create a new variable of dataMeans from the stepsPerInterval
-dataMeans <- stepsPerInterval
-data2[is.na(data)] = dataMeans
-```
+# Loop through rows with missing values and determinge replacements
+replacements <- unlist(lapply(missing_indices, FUN = function(index) {
+    interval = data2[index, ]$interval
+    dataMeans[dataMeans$interval == interval, ]$steps
+}))
 
-
-
-```r
-## display basic statistics to get a new, visual feeling of the dataset
-dim(data2)
-```
-
-```
-## [1] 17568     4
-```
-
-```r
-summary(data2)
+# Fill in replacements
+tmp_steps <- data2$steps
+tmp_steps[missing_indices] <- replacements
+df <- data.frame(steps = tmp_steps, date = data2$date, interval = data2$interval)
+summary(df)
 ```
 
 ```
-##      steps            date               interval         time      
-##  Min.   :  0.0   Min.   :2012-10-01   Min.   :   0   00:00  :   61  
-##  1st Qu.:  0.0   1st Qu.:2012-10-16   1st Qu.: 589   00:05  :   61  
-##  Median :  0.0   Median :2012-10-31   Median :1178   00:10  :   61  
-##  Mean   : 37.4   Mean   :2012-10-31   Mean   :1178   00:15  :   61  
-##  3rd Qu.: 27.0   3rd Qu.:2012-11-15   3rd Qu.:1766   00:20  :   61  
-##  Max.   :806.0   Max.   :2012-11-30   Max.   :2355   00:25  :   61  
-##                                                      (Other):17202
-```
-
-```r
-head(data2)
-```
-
-```
-##     steps       date interval  time
-## 1 1.71698 2012-10-01        0 00:00
-## 2 0.33962 2012-10-01        5 00:05
-## 3 0.13208 2012-10-01       10 00:10
-## 4 0.15094 2012-10-01       15 00:15
-## 5 0.07547 2012-10-01       20 00:20
-## 6 2.09434 2012-10-01       25 00:25
-```
-
-```r
-str(data2)
-```
-
-```
-## 'data.frame':	17568 obs. of  4 variables:
-##  $ steps   : num  1.717 0.3396 0.1321 0.1509 0.0755 ...
-##  $ date    : Date, format: "2012-10-01" "2012-10-01" ...
-##  $ interval: int  0 5 10 15 20 25 30 35 40 45 ...
-##  $ time    : Factor w/ 288 levels "00:00","00:05",..: 1 2 3 4 5 6 7 8 9 10 ...
+##      steps            date               interval   
+##  Min.   :  0.0   Min.   :2012-10-01   Min.   :   0  
+##  1st Qu.:  0.0   1st Qu.:2012-10-16   1st Qu.: 589  
+##  Median :  0.0   Median :2012-10-31   Median :1178  
+##  Mean   : 37.4   Mean   :2012-10-31   Mean   :1178  
+##  3rd Qu.: 27.0   3rd Qu.:2012-11-15   3rd Qu.:1766  
+##  Max.   :806.0   Max.   :2012-11-30   Max.   :2355
 ```
 
 
@@ -273,7 +235,7 @@ Do these values differ from the estimates from the first part of the assignment?
 library(ggplot2)
 
 ## Set steps per day (aggregate steps by date), calculate mean and median
-stepsPerDay <- aggregate(steps ~ date, data2, sum)
+stepsPerDay <- aggregate(steps ~ date, df, sum)
 colnames(stepsPerDay) <- c("date", "steps")
 meanSteps <- round(mean(stepsPerDay$steps), 2)
 medianSteps <- round(median(stepsPerDay$steps), 2)
@@ -293,17 +255,7 @@ ggplot(stepsPerDay, aes(x = steps)) + geom_histogram(fill = "green", binwidth = 
 
 ![plot of chunk mean total number of steps taken per day 2](figure/mean_total_number_of_steps_taken_per_day_2.png) 
 
-```r
-
-# Calculate the total amount of steps for both datasets
-totalSteps1 <- sum(data$steps, na.rm = TRUE)
-totalSteps2 <- sum(data2$steps)
-totalStepsDiff <- totalSteps2 - totalSteps1
-```
-
 What is the impact of imputing missing data on the estimates of the total daily number of steps? *Since we input the mean for missing values, the total of steps rises.*:
-The total amount of steps of the first dataset is **570608**, the total amount of the second datasets with filled in missing values is **6.5674 &times; 10<sup>5</sup>**. 
-The difference is **8.613 &times; 10<sup>4</sup>**.
 
 ## Are there differences in activity patterns between weekdays and weekends?
 This part of the assignement consitst of 2 tasks:
@@ -343,7 +295,7 @@ compareWeekendOrWeekday <- aggregate(steps ~ interval + weekendOrWeekday, data,
     FUN = mean, na.rm = TRUE)
 
 # Create a panel plot
-ggplot(compareWeekendOrWeekday, aes(x = interval, y = steps)) + geom_line(color = "blue", 
+ggplot(compareWeekendOrWeekday, aes(x = interval, y = steps)) + geom_line(color = "red", 
     size = 1) + facet_wrap(~weekendOrWeekday, nrow = 2, ncol = 1) + labs(x = "5-minute interval", 
     y = "number of steps") + theme_bw()
 ```
